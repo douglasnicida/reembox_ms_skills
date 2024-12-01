@@ -28,7 +28,7 @@ class RAGPipeline:
         :return: Lista de documentos encontrados.
         """
         loader = GoogleDriveLoader(folder_id)
-        docs = loader.load()  # Recupera os documentos da pasta
+        docs = loader.load() 
         print(f"Quantidade de documentos: {len(docs)}")
         for i, doc in enumerate(docs):
             print(f"Documento {i}: Tipo do documento: {type(doc)}")
@@ -38,10 +38,10 @@ class RAGPipeline:
         """
         Configura o modelo de embeddings com base no nome especificado.
         """
-        if self.embedding_model == "ollama :: nomic-embed-text":
+        if self.embedding_model == "ollama::nomic-embed-text":
             return OllamaEmbeddings(model="nomic-embed-text")
         
-        elif self.embedding_model == "openai :: text-embedding-ada-002":
+        elif self.embedding_model == "openai::text-embedding-ada-002":
             return OpenAIEmbeddings(model="text-embedding-ada-002")
         else:
             raise ValueError(f"Modelo de embeddings '{self.embedding_model}' não reconhecido!")
@@ -56,7 +56,7 @@ class RAGPipeline:
             return ChatOllama(model="llama3.1:70b")
         elif self.llm_model == "gpt-4":
             return ChatOpenAI(model="gpt-4")
-        # adicionar mais modelos se necessário
+    
         else:
             raise ValueError(f"Modelo de LLM '{self.llm_model}' não reconhecido!")
 
@@ -80,13 +80,29 @@ class RAGPipeline:
         all_splits = self.prepare_documents(docs)
         return Chroma.from_documents(documents=all_splits, embedding=self.embeddings)
 
-    def query(self, query: str) -> str:
+    def query(self, vectorstore, query: str) -> str:
         """
-        Faz uma consulta ao LLM utilizando o vetor de recuperação.
+        Faz uma consulta ao LLM utilizando o vetor de recuperação e busca documentos relevantes no vectorstore.
+        """
+        import time
         
-        :param query: Pergunta ou comando para o modelo.
-        :return: Resposta gerada pelo modelo.
-        """
-        # Aqui, você pode integrar o vectorstore na lógica de consulta, se necessário.
-        response = self.llm.invoke(query)
+        start_time = time.time()
+        relevant_docs = vectorstore.similarity_search(query, k=5) 
+        print(f"Tempo para similarity_search: {time.time() - start_time:.2f}s")
+        
+        context = "\n\n".join([doc.page_content for doc in relevant_docs])
+        max_context_length = 1000 
+        truncated_context = context[:max_context_length]
+        
+        start_time = time.time()
+        response = self.llm.invoke(
+            input=f"Contexto:\n{truncated_context}\n\nPergunta: {query}",
+            max_tokens=500, 
+            temperature=0.7,
+            top_p=0.9
+        )
+        print(f"Tempo para consulta ao LLM: {time.time() - start_time:.2f}s")
+        
         return response.content
+
+

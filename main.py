@@ -69,21 +69,28 @@ async def websocket_endpoint(websocket: WebSocket):
         data = await websocket.receive_json()  # Espera um JSON com query e folderId
         query = data.get('query')
         folder_id = data.get('folderId')
-        llmModel = data.get('llm_model')
-        embeddingModel = data.get('embedding_model')
+        llmModel = data.get('llmModel')
+        embeddingModel = data.get('embeddingModel')
+        
+        print(query, folder_id, llmModel, embeddingModel)
 
         if query and folder_id and llmModel and embeddingModel:
             rag_pipeline = RAGPipeline(embedding_model=embeddingModel,llm_model=llmModel)
-            
-            # Recuperar os documentos do Google Drive com o folderId
+                        
+            import time
+
+            start_time = time.time()
             docs = rag_pipeline.get_documents_from_drive(folder_id)
-            
-            # Criar o vetor de recuperação (vectorstore) a partir dos documentos
+            print(f"Carregamento dos documentos: {time.time() - start_time:.2f}s")
+
+            start_time = time.time()
             vectorstore = rag_pipeline.create_vectorstore(docs)
-            
-            # Realizar a consulta
+            print(f"Criação do vectorstore: {time.time() - start_time:.2f}s")
+
+            start_time = time.time()
             response = rag_pipeline.query(vectorstore, query)
-            
+            print(f"Consulta ao modelo: {time.time() - start_time:.2f}s")
+
             # Enviar a resposta de volta
             await websocket.send_text(response)
         else:
